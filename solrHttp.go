@@ -7,6 +7,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -15,6 +16,10 @@ import (
 	"os"
 	"strconv"
 	"time"
+)
+
+const (
+	readLimit = 1024 * 1024
 )
 
 type solrHttp struct {
@@ -112,16 +117,20 @@ func (s *solrHttp) Update(nodeUris []string, singleDoc bool, doc interface{}, op
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		htmlData, err := ioutil.ReadAll(resp.Body)
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		htmlData, err := ioutil.ReadAll(io.LimitReader(resp.Body, readLimit))
 		if err != nil {
 			return fmt.Errorf("error reading response body for StatusCode %d, err: %s", resp.StatusCode, err)
 		}
 		if resp.StatusCode == http.StatusNotFound {
 			return ErrNotFound
 		}
-		if resp.StatusCode < 500 {
+		if resp.StatusCode < http.StatusInternalServerError {
 			return NewSolrError(resp.StatusCode, string(htmlData))
 		}
 		return NewSolrInternalError(resp.StatusCode, string(htmlData))
@@ -180,14 +189,17 @@ func (s *solrHttp) Select(nodeUris []string, opts ...func(url.Values)) (SolrResp
 	if err != nil {
 		return sr, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		sr.Status = 404
 		return sr, ErrNotFound
 	}
 	if resp.StatusCode >= 400 {
-		htmlData, err := ioutil.ReadAll(resp.Body)
+		htmlData, err := ioutil.ReadAll(io.LimitReader(resp.Body, readLimit))
 		if err != nil {
 			return sr, err
 		}
@@ -246,7 +258,7 @@ func ClusterStateVersion(version int, collection string) func(url.Values) {
 	}
 }
 
-//Helper funcs for setting the solr query params
+// Helper funcs for setting the solr query params
 func FilterQuery(fq string) func(url.Values) {
 	return func(p url.Values) {
 		p["fq"] = []string{fq}
@@ -359,7 +371,7 @@ func (s *solrHttp) getBasicCredential(user string, password string) string {
 	return ""
 }
 
-//HTTPClient sets the HTTPer
+// HTTPClient sets the HTTPer
 func HTTPClient(cli HTTPer) func(*solrHttp) {
 	return func(c *solrHttp) {
 		c.queryClient = cli
@@ -367,15 +379,15 @@ func HTTPClient(cli HTTPer) func(*solrHttp) {
 	}
 }
 
-//DefaultRows sets number of rows for pagination
-//in calls that don't pass a number of rows in
+// DefaultRows sets number of rows for pagination
+// in calls that don't pass a number of rows in
 func DefaultRows(rows uint32) func(*solrHttp) {
 	return func(c *solrHttp) {
 		c.defaultRows = rows
 	}
 }
 
-//The path to tls certificate (optional)
+// The path to tls certificate (optional)
 func Cert(cert string) func(*solrHttp) {
 	return func(c *solrHttp) {
 		c.cert = cert

@@ -19,6 +19,7 @@ type solrZkInstance struct {
 	listening         bool
 	logger            Logger
 	sleepTimeMS       int
+	stop              chan struct{}
 }
 
 func NewSolrZK(zookeepers string, zkRoot string, collectionName string, opts ...func(*solrZkInstance)) SolrZK {
@@ -26,6 +27,7 @@ func NewSolrZK(zookeepers string, zkRoot string, collectionName string, opts ...
 		zookeeper:   NewZookeeper(zookeepers, zkRoot, collectionName),
 		sleepTimeMS: 500,
 		collection:  collectionName,
+		stop:        make(chan struct{}),
 	}
 
 	instance.clusterStateMutex = &sync.Mutex{}
@@ -172,15 +174,19 @@ func (s *solrZkInstance) GetReplicasFromRoute(route string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("[go-solr]  Collection %s does not exist ", s.collection)
 	}
-	//if contains route don't round robin
+	// if contains route don't round robin
 	hosts, err := findLiveReplicaUrls(route, &collection)
 	if err != nil {
 		return hosts, err
 	}
 
 	return shuffleNodes(hosts), nil
-
 }
+
+func (s *solrZkInstance) Close() {
+	close(s.stop)
+}
+
 func shuffleNodes(nodes []string) []string {
 	if len(nodes) == 1 {
 		return nodes

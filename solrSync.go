@@ -78,6 +78,11 @@ func (s *solrZkInstance) Listen() error {
 					s.setLiveNodes(liveNodes)
 				}
 				sleepTime = s.sleepTimeMS
+
+			case <-s.stop:
+				s.listening = false
+				s.zookeeper.Close()
+				return
 			}
 			if !shouldReconnect {
 				shouldReconnect = !s.zookeeper.IsConnected()
