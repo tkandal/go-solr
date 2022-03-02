@@ -94,9 +94,9 @@ func (s *solrZkInstance) Listen() error {
 					sleepTime = backoff(sleepTime)
 				} else {
 					sleepTime = s.sleepTimeMS
+					s.listening = true
+					shouldReconnect = false
 				}
-				shouldReconnect = false
-				s.listening = true
 			}
 		}
 	}()
