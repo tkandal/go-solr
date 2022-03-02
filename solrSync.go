@@ -28,7 +28,7 @@ func (s *solrZkInstance) Listen() error {
 	if err = connect(); err != nil {
 		return err
 	}
-	//loop forever
+	// loop forever
 	go func() {
 		log := s.logger
 		sleepTime := s.sleepTimeMS
@@ -42,7 +42,7 @@ func (s *solrZkInstance) Listen() error {
 				if cEvent.Err != nil {
 					log.Debug(fmt.Sprintf("[go-solr] error on cevent %v", cEvent))
 					logErr(cEvent.Err)
-					shouldReconnect = isConnectionClosed(err)
+					shouldReconnect = s.isConnectionClosed(err)
 					sleepTime = backoff(sleepTime)
 					break
 				}
@@ -61,7 +61,7 @@ func (s *solrZkInstance) Listen() error {
 			case nEvent := <-liveNodeEvents:
 				if nEvent.Err != nil {
 					logErr(nEvent.Err)
-					shouldReconnect = isConnectionClosed(err)
+					shouldReconnect = s.isConnectionClosed(err)
 					log.Error(fmt.Errorf("[go-solr] error on nevent %v", nEvent))
 					sleepTime = backoff(sleepTime)
 					break
@@ -80,6 +80,11 @@ func (s *solrZkInstance) Listen() error {
 				sleepTime = s.sleepTimeMS
 			}
 			if shouldReconnect {
+				s.zookeeper.Close()
+				if err := s.zookeeper.Connect(); err != nil {
+					s.listening = false
+					return
+				}
 				err = connect()
 				if err != nil {
 					s.logger.Error(fmt.Errorf("[go-solr] zk connect err %v, sleeping %d", err, sleepTime))
@@ -93,9 +98,11 @@ func (s *solrZkInstance) Listen() error {
 	s.listening = true
 	return nil
 }
-func isConnectionClosed(err error) bool {
-	return err == zk.ErrClosing || err == zk.ErrConnectionClosed
+func (s *solrZkInstance) isConnectionClosed(err error) bool {
+	// return err == zk.ErrClosing || err == zk.ErrConnectionClosed
+	return !s.zookeeper.IsConnected() || (err == zk.ErrClosing || err == zk.ErrConnectionClosed)
 }
+
 func backoff(sleepTime int) int {
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 	return sleepTime * 2

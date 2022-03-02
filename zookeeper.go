@@ -32,6 +32,7 @@ type Zookeeper interface {
 	GetLeaderElectW() (<-chan zk.Event, error)
 	GetClusterProps() (ClusterProps, error)
 	ZKLogger(l Logger)
+	Close()
 }
 
 func NewZookeeper(connectionString string, zkRoot string, collection string) Zookeeper {
@@ -43,9 +44,13 @@ func NewZookeeper(connectionString string, zkRoot string, collection string) Zoo
 	}
 }
 
+func (z *zookeeper) Close() {
+	z.zkConnection.Close()
+}
+
 func (z *zookeeper) Connect() error {
 	servers := strings.Split(z.connectionString, ",")
-	zkConnection, _, err := zk.Connect(servers, time.Second) //*10)
+	zkConnection, _, err := zk.Connect(servers, time.Second) // *10)
 	if err != nil {
 		return err
 	}
@@ -67,11 +72,11 @@ func (z *zookeeper) IsConnected() bool {
 }
 
 func (z *zookeeper) Get(node string) ([]byte, int, error) {
-	bytes, stat, err := z.zkConnection.Get(node)
+	byts, stat, err := z.zkConnection.Get(node)
 	if err != nil {
 		return nil, 0, err
 	}
-	return bytes, int(stat.Version), nil
+	return byts, int(stat.Version), nil
 }
 
 func (z *zookeeper) GetConnectionString() string {
@@ -80,8 +85,8 @@ func (z *zookeeper) GetConnectionString() string {
 
 func (z *zookeeper) Poll(path string, cb stateChanged) {
 	for {
-		bytes, _, err := z.Get(path)
-		cb(bytes, err)
+		byts, _, err := z.Get(path)
+		cb(byts, err)
 		time.Sleep(z.pollSleep)
 	}
 }
