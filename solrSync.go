@@ -79,6 +79,9 @@ func (s *solrZkInstance) Listen() error {
 				}
 				sleepTime = s.sleepTimeMS
 			}
+			if !shouldReconnect {
+				shouldReconnect = !s.zookeeper.IsConnected()
+			}
 			if shouldReconnect {
 				s.zookeeper.Close()
 				if err := s.zookeeper.Connect(); err != nil {
@@ -92,6 +95,8 @@ func (s *solrZkInstance) Listen() error {
 				} else {
 					sleepTime = s.sleepTimeMS
 				}
+				shouldReconnect = false
+				s.listening = true
 			}
 		}
 	}()
