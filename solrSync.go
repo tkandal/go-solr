@@ -83,26 +83,27 @@ func (s *solrZkInstance) Listen() error {
 				shouldReconnect = !s.zookeeper.IsConnected()
 			}
 			if shouldReconnect {
+				s.listening = false
 				s.zookeeper.Close()
 				if err := s.zookeeper.Connect(); err != nil {
-					s.listening = false
 					return
 				}
 				err = connect()
 				if err != nil {
 					s.logger.Error(fmt.Errorf("[go-solr] zk connect err %v, sleeping %d", err, sleepTime))
 					sleepTime = backoff(sleepTime)
-				} else {
-					sleepTime = s.sleepTimeMS
-					s.listening = true
-					shouldReconnect = false
+					continue
 				}
+				sleepTime = s.sleepTimeMS
+				s.listening = true
+				shouldReconnect = false
 			}
 		}
 	}()
 	s.listening = true
 	return nil
 }
+
 func (s *solrZkInstance) isConnectionClosed(err error) bool {
 	// return err == zk.ErrClosing || err == zk.ErrConnectionClosed
 	return !s.zookeeper.IsConnected() || (err == zk.ErrClosing || err == zk.ErrConnectionClosed)
