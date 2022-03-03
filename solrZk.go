@@ -184,7 +184,7 @@ func (s *solrZkInstance) GetReplicasFromRoute(route string) ([]string, error) {
 }
 
 func (s *solrZkInstance) Close() {
-	log.Println("called close on solr instance...")
+	s.logger.Info("called close on solr instance...")
 	close(s.shouldStop)
 }
 

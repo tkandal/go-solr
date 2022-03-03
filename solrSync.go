@@ -82,12 +82,12 @@ func (s *solrZkInstance) Listen() error {
 			case <-s.shouldStop:
 				log.Info("closing connection to zookeeper...")
 				s.zookeeper.Close()
-				s.listening = false
+				s.setListening(false)
 				shouldReconnect = false
 				return
 			}
 			if shouldReconnect {
-				s.listening = false
+				s.setListening(false)
 				s.zookeeper.Close()
 				if err := s.zookeeper.Connect(); err != nil {
 					return
@@ -99,7 +99,7 @@ func (s *solrZkInstance) Listen() error {
 					continue
 				}
 				sleepTime = s.sleepTimeMS
-				s.listening = true
+				s.setListening(true)
 				shouldReconnect = false
 			}
 		}
@@ -108,9 +108,13 @@ func (s *solrZkInstance) Listen() error {
 	return nil
 }
 
+func (s *solrZkInstance) setListening(b bool) {
+	s.listening = b
+}
+
 func (s *solrZkInstance) isConnectionClosed(err error) bool {
 	// return err == zk.ErrClosing || err == zk.ErrConnectionClosed
-	return !s.zookeeper.IsConnected() || (err == zk.ErrClosing || err == zk.ErrConnectionClosed)
+	return !s.zookeeper.IsConnected() || err == zk.ErrClosing || err == zk.ErrConnectionClosed
 }
 
 func backoff(sleepTime int) int {
