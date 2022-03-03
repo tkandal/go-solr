@@ -79,13 +79,12 @@ func (s *solrZkInstance) Listen() error {
 				}
 				sleepTime = s.sleepTimeMS
 
-			case <-s.stop:
-				s.listening = false
+			case <-s.shouldStop:
+				log.Info("closing connection to zookeeper...")
 				s.zookeeper.Close()
+				s.listening = false
+				shouldReconnect = false
 				return
-			}
-			if !shouldReconnect {
-				shouldReconnect = !s.zookeeper.IsConnected()
 			}
 			if shouldReconnect {
 				s.listening = false

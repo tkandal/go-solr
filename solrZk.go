@@ -19,7 +19,7 @@ type solrZkInstance struct {
 	listening         bool
 	logger            Logger
 	sleepTimeMS       int
-	stop              chan struct{}
+	shouldStop        chan struct{}
 }
 
 func NewSolrZK(zookeepers string, zkRoot string, collectionName string, opts ...func(*solrZkInstance)) SolrZK {
@@ -27,7 +27,7 @@ func NewSolrZK(zookeepers string, zkRoot string, collectionName string, opts ...
 		zookeeper:   NewZookeeper(zookeepers, zkRoot, collectionName),
 		sleepTimeMS: 500,
 		collection:  collectionName,
-		stop:        make(chan struct{}),
+		shouldStop:  make(chan struct{}),
 	}
 
 	instance.clusterStateMutex = &sync.Mutex{}
@@ -184,7 +184,7 @@ func (s *solrZkInstance) GetReplicasFromRoute(route string) ([]string, error) {
 }
 
 func (s *solrZkInstance) Close() {
-	close(s.stop)
+	close(s.shouldStop)
 }
 
 func shuffleNodes(nodes []string) []string {
